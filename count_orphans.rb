@@ -1,4 +1,5 @@
 require 'aws-sdk'
+require 'logger'
 require 'pry'
 require 'ruby-progressbar'
 
@@ -23,14 +24,14 @@ class CountOrphans
     items.select { |i| i['rid'] == 3 }
   end
 
-  def self.count_items(items, orphans)
+  def self.count_items(items, orphans, log)
     items.each do |item|
-      orphans = count_item(item, orphans)
+      orphans = count_item(item, orphans, log)
     end
     return orphans
   end
 
-  def self.count_item(item, orphans)
+  def self.count_item(item, orphans, log)
     existing_params = {
       table_name: 'CustomerLoyaltyAccount',
       key: {
@@ -42,16 +43,19 @@ class CountOrphans
     existing_item = dynamodb.get_item(existing_params)
     if existing_item['item'].nil?
       orphans += 1
+      log.warn(item)
     end
     return orphans
   end
 
   def self.count_target_items
+    log = Logger.new('log.txt')
+
     # This value is hard-coded as of 7/1/20
     progressbar = ProgressBar.create(:total => 3737727, :format => "%a %B %P%% %t")
 
-    # starting_point = {:exclusive_start_key=>{"cid"=>0.33523316e8, "rid"=>0.1433e4}}
-    starting_point = {}
+    starting_point = {:exclusive_start_key=>{"cid"=>0.10615705e8, "rid"=>0.1433e4}}
+    # starting_point = {}
     response = get_items(starting_point)
 
     total_items = 0
@@ -62,7 +66,7 @@ class CountOrphans
       items_to_count = get_target_items(response.items)
 
       if !items_to_count.empty?
-        orphans = count_items(items_to_count, orphans)
+        orphans = count_items(items_to_count, orphans, log)
       else
         puts "No Target links to count in this batch\n"
       end
